@@ -3,6 +3,7 @@ package com.fadwa.fd_store.controllers;
 import com.fadwa.fd_store.models.ProductDto;
 import com.fadwa.fd_store.services.ProductsService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,7 +16,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.*;
+import java.nio.file.StandardCopyOption;
+import java.util.Date;
 import java.util.List;
 
 @Controller
@@ -26,6 +34,9 @@ public class ProductsController {
     private ProductsRepository productsRepository;
     @Autowired
     private ProductsService productService;
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
 
     @GetMapping("/image/{id}")
     @ResponseBody
@@ -67,5 +78,57 @@ public class ProductsController {
 
     }
 
+    @PostMapping("/create")
+    public String createProduct (
+            @Valid @ModelAttribute ProductDto productDto,
+            BindingResult result) {
 
+        if(productDto.getImagefile().isEmpty()) {
+            result.addError(new FieldError("productDto", "imagefile", "The image file is required"));
+        }
+
+        if (result.hasErrors()) {
+            return "products/createProduct";
+        }
+
+        // Save the image file and store its path
+        MultipartFile image = productDto.getImagefile();
+        Date createdAt = new Date();
+        String storageFileName = createdAt.getTime() + "_" + image.getOriginalFilename();
+
+        try {
+            // Ensure the upload directory exists
+            Path uploadPath = Paths.get(uploadDir);
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath); // create directory if it doesn't exist
+            }
+
+            // Save the image file in the directory
+            try (InputStream inputStream = image.getInputStream()) {
+                Path filePath = uploadPath.resolve(storageFileName);
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ex) {
+                System.out.println("Exception while saving image: " + ex.getMessage());
+            }
+
+            // Save the product data to the database
+            Product product = new Product();
+            product.setName(productDto.getName());
+            product.setBrand(productDto.getBrand());
+            product.setCategory(productDto.getCategory());
+            product.setPrice(productDto.getPrice());
+            product.setDescription(productDto.getDescription());
+            product.setCreatedAt(createdAt);
+
+            // Store only the image file name in the database (not the file bytes)
+            product.setImagefile(storageFileName.getBytes()); // OR store only the filename as String
+
+            productsRepository.save(product);
+
+            return "redirect:/products";
+        } catch (IOException e) {
+            throw new RuntimeException("Error saving product image", e);
+        }
+    }
 }
