@@ -66,24 +66,24 @@ public class ProductsController {
             System.out.println("Created At: " + product.getCreatedAt());
         }
 
-        model.addAttribute("products",products);
+        model.addAttribute("products", products);
         return "products/index";
     }
 
     @GetMapping("/create")
-    public String showCreatePage (Model model) {
+    public String showCreatePage(Model model) {
         ProductDto productDto = new ProductDto();
-        model.addAttribute("productDto",productDto);
+        model.addAttribute("productDto", productDto);
         return "products/CreateProduct";
 
     }
 
     @PostMapping("/create")
-    public String createProduct (
+    public String createProduct(
             @Valid @ModelAttribute ProductDto productDto,
             BindingResult result) {
 
-        if(productDto.getImagefile().isEmpty()) {
+        if (productDto.getImagefile().isEmpty()) {
             result.addError(new FieldError("productDto", "imagefile", "The image file is required"));
         }
 
@@ -133,10 +133,10 @@ public class ProductsController {
     }
 
     @GetMapping("/edit")
-    public String ShowEditPage ( Model model, @RequestParam int id) {
+    public String ShowEditPage(Model model, @RequestParam int id) {
         try {
             Product product = productsRepository.findById(id).get();
-            model.addAttribute("product",product);
+            model.addAttribute("product", product);
 
             ProductDto productDto = new ProductDto();
             productDto.setName(product.getName());
@@ -146,37 +146,35 @@ public class ProductsController {
             productDto.setPrice(product.getPrice());
 
             model.addAttribute("productDto", productDto);
-        }
-        catch (Exception ex) {
-            System.out.println("Exception: " +ex.getMessage());
+        } catch (Exception ex) {
+            System.out.println("Exception: " + ex.getMessage());
             return "redirect:/products";
         }
         return "products/EditProduct";
     }
 
     @PostMapping("/edit")
-    public String updateProduct (Model model,
-                                 @RequestParam int id,
-                                 @Valid @ModelAttribute ProductDto productDto,
-                                 BindingResult result){
+    public String updateProduct(Model model,
+                                @RequestParam int id,
+                                @Valid @ModelAttribute ProductDto productDto,
+                                BindingResult result) {
 
         try {
             Product product = productsRepository.findById(id).get();
-            model.addAttribute("product",product);
+            model.addAttribute("product", product);
 
             if (result.hasErrors()) {
                 return "products/EditProduct";
             }
 
-            if(!productDto.getImagefile().isEmpty()) {
+            if (!productDto.getImagefile().isEmpty()) {
                 //delete old image
                 String uploadDir = "public/images/";
                 Path oldImagePath = Paths.get(uploadDir + product.getImagefile());
 
                 try {
                     Files.delete(oldImagePath);
-                }
-                catch (Exception ex) {
+                } catch (Exception ex) {
                     System.out.println("Exception: " + ex.getMessage());
                 }
 
@@ -185,7 +183,7 @@ public class ProductsController {
                 Date createdAt = new Date();
                 String storageFileName = createdAt.getTime() + "_" + image.getOriginalFilename();
 
-                try (InputStream inputStream = image.getInputStream()){
+                try (InputStream inputStream = image.getInputStream()) {
                     Files.copy(inputStream, Paths.get(uploadDir + storageFileName),
                             StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -201,12 +199,34 @@ public class ProductsController {
 
             productsRepository.save(product);
 
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             System.out.println("Exception: " + ex.getMessage());
         }
 
         return "redirect:/products";
+    }
 
+    @GetMapping("/delete")
+    public String deleteProduct(@RequestParam int id) {
+
+        try {
+            Product product = productsRepository.findById(id).get();
+
+            // delete product image
+            Path imagePath = Paths.get("public/images/" + product.getImagefile());
+
+            try {
+                Files.delete(imagePath);
+            } catch (Exception ex) {
+                System.out.println("Exception: " + ex.getMessage());
+            }
+
+            // delete the product
+            productsRepository.delete(product);
+
+        } catch (Exception ex) {
+            System.out.println("Exception: " + ex.getMessage());
+        }
+        return "redirect:/products";
     }
 }
